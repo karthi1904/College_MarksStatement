@@ -108,6 +108,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
+            // Dynamically hide course options based on programme
+            if (metaData.programme !== "II-MSC CS 'A'") {
+                const codeSelect = paperSlip.querySelector('.course-code-dropdown');
+                const nameSelect = paperSlip.querySelector('.course-dropdown');
+                if (codeSelect) {
+                    while (codeSelect.options.length > 1) codeSelect.remove(1);
+                }
+                if (nameSelect) {
+                    while (nameSelect.options.length > 1) nameSelect.remove(1);
+                }
+            }
+
             // Restore sync-meta input values from metaData
             paperSlip.querySelectorAll('.sync-meta').forEach(input => {
                 const key = input.getAttribute('data-meta-id');
@@ -130,12 +142,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const student = studentData[globalIndex];
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td class="col-sno" data-sno-index="${globalIndex}"></td>
+                    <td class="col-sno-cell">
+                        <input type="text" class="input-sno" data-global-index="${globalIndex}" value="${student.sno || ''}" maxlength="5">
+                    </td>
                     <td class="col-reg-cell">
                         <input type="text" class="input-reg" data-global-index="${globalIndex}" value="${student.reg}" maxlength="15">
                     </td>
                     <td class="col-marks-cell">
-                        <input type="number" class="input-mark" data-global-index="${globalIndex}" min="0" max="100" value="${student.mark}">
+                        <input type="text" class="input-mark" data-global-index="${globalIndex}" min="0" max="100" value="${student.mark}">
                     </td>`;
                 tbody.appendChild(tr);
             }
@@ -202,6 +216,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (metaId === 'programme' && val) {
                 autoFillClassData(val);
             }
+
+            if (metaId === 'course-name' && val) {
+                autoFillCourseCode(val);
+            }
+            return;
+        }
+
+        // Handle S.No entry
+        if (e.target.classList.contains('input-sno')) {
+            const idx = parseInt(e.target.getAttribute('data-global-index'));
+            studentData[idx].sno = e.target.value;
             return;
         }
 
@@ -218,10 +243,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const idx = parseInt(e.target.getAttribute('data-global-index'));
             studentData[idx].mark = e.target.value;
 
-            let val = parseInt(e.target.value);
-            if (e.target.value !== '' && (isNaN(val) || val < 0 || val > 100)) {
+            let valStr = e.target.value.trim().toUpperCase();
+            let val = parseInt(valStr);
+            let isAllowedString = (valStr === 'A' || valStr === 'P');
+
+            if (valStr !== '' && !isAllowedString && (isNaN(val) || val < 0 || val > 100)) {
                 e.target.style.border = '2px solid var(--accent-red)';
-                showToast('Marks must be between 0 and 100', 'error');
+                showToast("Marks must be between 0 and 100, or 'A' / 'P'", 'error');
             } else {
                 e.target.style.border = '';
             }
@@ -325,15 +353,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let highest = -Infinity;
         let lowest = Infinity;
         
-        let currentSno = 1;
-
         studentData.forEach((student, idx) => {
             const hasData = student.reg.trim() !== '' || String(student.mark).trim() !== '';
-            
-            const snoTd = document.querySelector(`.col-sno[data-sno-index="${idx}"]`);
-            if (snoTd) {
-                snoTd.textContent = hasData ? currentSno++ : '';
-            }
 
             const markVal = student.mark;
             
@@ -389,21 +410,47 @@ document.addEventListener('DOMContentLoaded', () => {
             metaData.section = secVal;
             document.querySelectorAll('.sync-meta[data-meta-id="section"]').forEach(el => el.value = secVal);
         }
-        if (progVal) {
-            metaData.programme = progVal;
+        if (selectedProg) {
+            metaData.programme = selectedProg;
         }
 
-        // Auto-fill student records from College_data.csv database
-        const count = collegeStudentDatabase.length;
-        const numSlipsNeeded = Math.max(1, Math.ceil(count / SLIP_ROW_COUNT));
-        studentData = Array.from({length: numSlipsNeeded * SLIP_ROW_COUNT}, () => ({reg: '', mark: ''}));
+        if (selectedProg === "II-MSC CS 'A'") {
+            // Auto-fill student records from College_data.csv database
+            const count = collegeStudentDatabase.length;
+            const numSlipsNeeded = Math.max(1, Math.ceil(count / SLIP_ROW_COUNT));
+            studentData = Array.from({length: numSlipsNeeded * SLIP_ROW_COUNT}, () => ({reg: '', mark: ''}));
 
-        collegeStudentDatabase.forEach((st, i) => {
-            studentData[i] = { reg: st.reg, mark: '' };
-        });
+            collegeStudentDatabase.forEach((st, i) => {
+                studentData[i] = { sno: String(i + 1), reg: st.reg, mark: '' };
+            });
+            showToast(`✓ Auto-filled ${count} student records for ${selectedProg} from College_data.csv!`, 'success');
+        } else {
+            // Clear student data for other selections
+            studentData = Array.from({length: SLIP_ROW_COUNT}, () => ({reg: '', mark: ''}));
+            metaData.courseName = "";
+            metaData.courseCode = "";
+        }
 
         renderSlips(true);
-        showToast(`✓ Auto-filled ${count} student records for ${selectedProg} from College_data.csv!`, 'success');
+    }
+
+    /* ==========================================================================
+       AUTO-FILL COURSE CODE
+       ========================================================================== */
+    function autoFillCourseCode(courseName) {
+        const courseMapping = {
+            "AI & ML": "P24MCS311TA",
+            "SPM": "P24MCS312TA",
+            "CNS": "P24MCS314TA",
+            "E-Commerce Technologies": "P24LCS303TA",
+            "Softskills for Professional Excellence": "P24VCC301TA"
+        };
+
+        const code = courseMapping[courseName];
+        if (code) {
+            metaData.courseCode = code;
+            document.querySelectorAll('.sync-meta[data-meta-id="course-code"]').forEach(el => el.value = code);
+        }
     }
 
     /* ==========================================================================
@@ -428,6 +475,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Fill 32 student records
         for (let idx = 0; idx < 32; idx++) {
             const rollNumber = String(101 + idx);
+            studentData[idx].sno = String(idx + 1);
             studentData[idx].reg = `${mockRegPrefix}${rollNumber}`;
             studentData[idx].mark = markGenerator();
         }
@@ -576,7 +624,7 @@ document.addEventListener('DOMContentLoaded', () => {
         studentData = Array.from({length: numSlipsNeeded * SLIP_ROW_COUNT}, () => ({reg: '', mark: ''}));
 
         parsed.forEach((student, idx) => {
-            studentData[idx] = { reg: student.reg, mark: student.mark };
+            studentData[idx] = { sno: String(idx + 1), reg: student.reg, mark: student.mark };
         });
 
         renderSlips(true);
