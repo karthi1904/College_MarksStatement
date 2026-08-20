@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
         seminar: "",
         presem: ""
     };
-    
+     
     // Initialize Theme
     initTheme();
     
@@ -380,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /* ==========================================================================
-       AUTO-FILL FROM COLLEGE_DATA.CSV
+       AUTO-FILL FROM COLLEGE_DATA.CSV file for II-MSC CS 'A' PROGRAMME
        ========================================================================== */
     function autoFillClassData(selectedProg) {
         if (!selectedProg) return;
